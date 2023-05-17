@@ -3,13 +3,14 @@ from unittest.mock import Mock, patch, call
 
 import pytest
 
-from constants import LAST_MESSAGES
+
 from server import Server
+from settings import ChatSettings
 
 
 @pytest.fixture(scope='function')
 def server():
-    return Server()
+    return Server(ChatSettings())
 
 
 @patch('server.User.receive_message')
@@ -36,7 +37,7 @@ async def test_send_last_messages(server):
 
     user1.send_message.assert_has_calls(
         [
-            call(f'The last {LAST_MESSAGES} messages in the public chat:\n'),
+            call('The last 20 messages in the public chat:\n'),
             call('user1: hello \n'),
             call('user2: world \n')
         ]

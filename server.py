@@ -3,21 +3,21 @@ import threading
 import uuid
 from datetime import datetime
 
-from constants import (LAST_MESSAGES, HOST, PORT, MAX_MESSAGE_PER_PERIOD,
-                       PERIOD_DURATION, WELCOME, BAN_PERIOD, CHAT_NAME)
+from settings import ChatSettings
 from user import User
 from utils import logger
 
 
 class Server:
-    def __init__(self, host: str = HOST, port: int = PORT) -> None:
-        self.host = host
-        self.port = port
+    def __init__(self, settings: ChatSettings) -> None:
+        self.settings = settings
+        self.host = settings.HOST
+        self.port = settings.PORT
         self.public_chat_history = []
         self.users = {}
         self.message_counts = {}
-        self.max_messages_per_period = MAX_MESSAGE_PER_PERIOD
-        self.period_duration = PERIOD_DURATION
+        self.max_messages_per_period = settings.MAX_MESSAGE_PER_PERIOD
+        self.period_duration = settings.PERIOD_DURATION
         self.delayed_messages = {}
 
     async def start(self) -> None:
@@ -46,7 +46,7 @@ class Server:
         self.set_username(user, await user.receive_message())
         self.users[user.username] = user
         logger.info(f'Add user {user.username} to users list')
-        user.send_message(WELCOME)
+        user.send_message(self.settings.WELCOME)
         logger.info(f'Send welcome to {user.username}')
         await self.send_last_messages(user)
         await self.check_messages(user)
@@ -69,10 +69,11 @@ class Server:
         if len(self.public_chat_history) > 0:
             messages = []
             user.send_message(
-                f'The last {LAST_MESSAGES} messages in the public chat:\n'
+                f'The last {self.settings.LAST_MESSAGES} messages in the '
+                f'public chat:\n'
             )
             num_messages_to_send = min(
-                len(self.public_chat_history), LAST_MESSAGES
+                len(self.public_chat_history), self.settings.LAST_MESSAGES
             )
             messages_to_send = self.public_chat_history[-num_messages_to_send:]
             for message in messages_to_send:
@@ -81,31 +82,60 @@ class Server:
             for username, msg in messages:
                 user.send_message(f'{username}: {msg} \n')
             logger.info(
-                f'Send {LAST_MESSAGES} last messages to {user.username}'
+                f'Send {self.settings.LAST_MESSAGES} last messages to '
+                f'{user.username}'
             )
         else:
             user.send_message('Public chat history is empty')
             logger.info(f'Public history is empty for user {user.username}')
+
+    # async def check_messages(self, user: User) -> None:
+    #     """Check command before send message"""
+    #
+    #     while True:
+    #         message = await user.receive_message()
+    #         if user.reports < 3:
+    #             if message.startswith('username'):
+    #                 self.set_username(user, message)
+    #             elif message.startswith('status'):
+    #                 self.get_chat_status(user)
+    #             elif message.startswith('pm'):
+    #                 self.private_message(message, user)
+    #             elif message.startswith('ban'):
+    #                 self.report(message, user)
+    #             elif message.startswith('delay'):
+    #                 self.delayed_message(message, user)
+    #             elif message.startswith('cancel '):
+    #                 self.cancel_delayed_message(message, user)
+    #             elif message.startswith('exit'):
+    #                 break
+    #             else:
+    #                 self.public_chat(message, user)
 
     async def check_messages(self, user: User) -> None:
         """Check command before send message"""
 
         while True:
             message = await user.receive_message()
-            if user.reports < 3:
-                if message.startswith('username'):
-                    self.set_username(user, message)
-                elif message.startswith('status'):
+            if user.reports >= 3:
+                break
+
+            match message.split()[0]:
+                case 'status':
                     self.get_chat_status(user)
-                elif message.startswith('pm'):
+                case 'exit':
+                    break
+                case 'username':
+                    self.set_username(user, message)
+                case 'pm':
                     self.private_message(message, user)
-                elif message.startswith('ban'):
+                case 'ban':
                     self.report(message, user)
-                elif message.startswith('delay'):
+                case 'delay':
                     self.delayed_message(message, user)
-                elif message.startswith('cancel '):
+                case 'cancel':
                     self.cancel_delayed_message(message, user)
-                else:
+                case _:
                     self.public_chat(message, user)
 
     def public_chat(self, message: str, sender: User) -> None:
@@ -157,10 +187,9 @@ class Server:
     def get_chat_status(self, sender: User) -> None:
         """Get information about public chat."""
 
-        chat_name = CHAT_NAME
         num_users = len(self.users)
         user_names = ", ".join(self.users.keys())
-        message = f'{chat_name}: {num_users} users - {user_names}'
+        message = f'{self.settings.CHAT_NAME}: {num_users} users: {user_names}'
         sender.send_message(message)
 
     def private_message(self, message: str, sender: User) -> None:
@@ -206,7 +235,9 @@ class Server:
                 if reported_user.reports > 2:
                     reported_user.send_message('You have been banned')
                     logger.info(f'{reported_user.username} has been banned.')
-                    timer = threading.Timer(BAN_PERIOD, self.unban_user)
+                    timer = threading.Timer(
+                        self.settings.BAN_PERIOD, self.unban_user
+                    )
                     timer.start()
             else:
                 sender.send_message(f'Recipient {reported_user} not found')
@@ -301,5 +332,5 @@ class Server:
 
 
 if __name__ == '__main__':
-    server = Server()
+    server = Server(ChatSettings())
     asyncio.run(server.start())
