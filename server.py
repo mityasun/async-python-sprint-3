@@ -89,29 +89,6 @@ class Server:
             user.send_message('Public chat history is empty')
             logger.info(f'Public history is empty for user {user.username}')
 
-    # async def check_messages(self, user: User) -> None:
-    #     """Check command before send message"""
-    #
-    #     while True:
-    #         message = await user.receive_message()
-    #         if user.reports < 3:
-    #             if message.startswith('username'):
-    #                 self.set_username(user, message)
-    #             elif message.startswith('status'):
-    #                 self.get_chat_status(user)
-    #             elif message.startswith('pm'):
-    #                 self.private_message(message, user)
-    #             elif message.startswith('ban'):
-    #                 self.report(message, user)
-    #             elif message.startswith('delay'):
-    #                 self.delayed_message(message, user)
-    #             elif message.startswith('cancel '):
-    #                 self.cancel_delayed_message(message, user)
-    #             elif message.startswith('exit'):
-    #                 break
-    #             else:
-    #                 self.public_chat(message, user)
-
     async def check_messages(self, user: User) -> None:
         """Check command before send message"""
 
@@ -124,6 +101,7 @@ class Server:
                 case 'status':
                     self.get_chat_status(user)
                 case 'exit':
+                    logger.info(f'User {user.username} came out from chat')
                     break
                 case 'username':
                     self.set_username(user, message)
